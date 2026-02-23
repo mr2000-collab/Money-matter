@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lend & Borrow Tracker</title>
+    <style>
+        /* --- Base Variables & Setup --- */
+        :root {
+            --bg-color: #f8f9fa;
+            --text-main: #2d3436;
+            --text-muted: #636e72;
+            --lend-color: #0984e3;
+            --borrow-color: #d63031;
+            --net-color: #00b894;
+            --card-bg: #ffffff;
+            --border-radius: 16px;
+            --danger: #ff7675;
+            --edit: #74b9ff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+        body { background-color: #dfe6e9; display: flex; justify-content: center; height: 100vh; overflow: hidden; color: var(--text-main); }
+
+        /* --- Mobile App Container --- */
+        #app-container {
+            width: 100%; max-width: 480px; height: 100%;
+            background-color: var(--bg-color); position: relative;
+            overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--card-bg); padding: 20px; text-align: center;
+            font-size: 1.25rem; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; z-index: 10; height: 70px; flex-shrink: 0;
+        }
+        .back-btn {
+            position: absolute; left: 15px; background: none; border: none;
+            font-size: 1.5rem; color: var(--text-main); cursor: pointer;
+            display: none; padding: 10px;
+        }
+
+        /* --- Page Animations --- */
+        .page-wrapper { position: relative; flex: 1; overflow: hidden; }
+        .page {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-color); transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            overflow-y: auto; padding-bottom: 90px; display: none; flex-direction: column;
+        }
+        .page.active { transform: translateX(0); display: flex; z-index: 5; }
+        .page.prev { transform: translateX(-30%); display: flex; z-index: 4; opacity: 0.8; }
+
+        /* --- Homepage Dashboard --- */
+        .net-balance {
+            margin: 20px; padding: 30px 20px; background: var(--net-color);
+            color: white; border-radius: var(--border-radius); text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 184, 148, 0.3);
+        }
+        .net-balance h2 { font-size: 2.5rem; margin-top: 5px; font-weight: 700; }
+        
+        .dashboard-cards { display: flex; gap: 15px; padding: 0 20px; }
+        .card {
+            flex: 1; padding: 25px 15px; border-radius: var(--border-radius);
+            background: var(--card-bg); text-align: center; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: transform 0.1s;
+        }
+        .card:active { transform: scale(0.96); }
+        .card h3 { font-size: 1.4rem; margin-top: 8px; }
+        .card.lend h3 { color: var(--lend-color); }
+        .card.borrow h3 { color: var(--borrow-color); }
+
+        /* --- Lists & Items --- */
+        .list-container { padding: 20px; }
+        .list-item {
+            background: var(--card-bg); padding: 16px; border-radius: 12px;
+            margin-bottom: 12px; display: flex; justify-content: space-between;
+            align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.03); 
+        }
+        .list-item-content { flex: 1; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding-right: 15px; }
+        .list-item-content:active { opacity: 0.7; }
+        
+        .name { font-weight: 600; font-size: 1.1rem; }
+        .amount { font-weight: 700; font-size: 1.15rem; }
+        .amount.lend { color: var(--lend-color); }
+        .amount.borrow { color: var(--borrow-color); }
+        .amount.return { color: var(--net-color); }
+
+        /* --- Action Icons (Edit/Delete) --- */
+        .item-actions { display: flex; gap: 10px; align-items: center; border-left: 1px solid #eee; padding-left: 10px; }
+        .icon-btn { 
+            background: none; border: none; font-size: 1.1rem; cursor: pointer; 
+            padding: 8px; border-radius: 8px; transition: background 0.2s;
+        }
+        .icon-btn.delete { color: var(--danger); }
+        .icon-btn.edit { color: var(--edit); }
+        .icon-btn:active { background: #f0f3f5; }
+
+        /* --- Detail Page Specifics --- */
+        .person-summary {
+            background: var(--card-bg); padding: 20px; text-align: center;
+            border-bottom: 1px solid #eee; margin-bottom: 10px;
+        }
+        .transaction-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 10px; }
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; background: #eee;}
+        
+        .action-buttons { display: flex; gap: 10px; padding: 0 20px; margin-top: 10px; }
+        .btn-action {
+            flex: 1; padding: 12px; color: white; text-align: center; 
+            border-radius: 10px; font-weight: 600; border: none; cursor: pointer;
+        }
+        .btn-return { background: var(--net-color); }
+        .btn-new-entry { background: var(--text-main); }
+
+        /* --- Floating Action Button (FAB) --- */
+        .fab {
+            position: absolute; bottom: 25px; right: 25px;
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--text-main); color: white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: none; cursor: pointer; z-index: 20;
+        }
+
+        /* --- Modals (Bottom Sheets) --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); display: none;
+            justify-content: center; align-items: flex-end; z-index: 100;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-content {
+            background: var(--card-bg); width: 100%; border-radius: 24px 24px 0 0;
+            padding: 30px 20px; transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;}
+        .form-group input, .form-group select {
+            width: 100%; padding: 14px; border: 1px solid #dfe6e9; border-radius: 10px;
+            font-size: 1rem; background: #f8f9fa; outline: none;
+        }
+        
+        .btn-submit {
+            width: 100%; padding: 16px; background: var(--text-main); color: white;
+            border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; margin-top: 10px; cursor: pointer;
+        }
+        .btn-submit.return { background: var(--net-color); }
+        .btn-submit.delete { background: var(--danger); }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <header>
+        <button class="back-btn" id="backBtn" onclick="goBack()">&#8592;</button>
+        <span id="header-title">Dashboard</span>
+    </header>
+
+    <div class="page-wrapper">
+        <div id="page-home" class="page active">
+            <div class="net-balance">
+                <p>Net Balance</p>
+                <h2>₹ 3,500</h2>
+            </div>
+            <div class="dashboard-cards">
+                <div class="card lend" onclick="navigate('page-lend', 'Lent To')">
+                    <p>Total Lent</p>
+                    <h3>₹ 5,000</h3>
+                </div>
+                <div class="card borrow" onclick="navigate('page-borrow', 'Borrowed From')">
+                    <p>Total Borrowed</p>
+                    <h3>₹ 1,500</h3>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-lend" class="page">
+            <div class="list-container">
+                <div class="list-item">
+                    <div class="list-item-content" onclick="navigate('page-details-lend', 'Rahul')">
+                        <span class="name">Rahul</span>
+                        <span class="amount lend">₹ 3,000</span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="icon-btn delete" onclick="confirmDelete('Name: Rahul')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+            <button class="fab" onclick="openModal('New Person')">+</button>
+        </div>
+
+        <div id="page-borrow" class="page">
+            <div class="list-container">
+                <div class="list-item">
+                    <div class="list-item-content" onclick="navigate('page-details-borrow', 'Amit')">
+                        <span class="name">Amit</span>
+                        <span class="amount borrow">₹ 1,500</span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="icon-btn delete" onclick="confirmDelete('Name: Amit')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+            <button class="fab" onclick="openModal('New Person')">+</button>
+        </div>
+
+        <div id="page-details-lend" class="page">
+            <div class="person-summary">
+                <h2 id="detail-name-lend">Rahul</h2>
+                <p>Pending: <strong class="amount lend">₹ 3,000</strong></p>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-action btn-return" onclick="openModal('Return Money')">Log Return</button>
+                <button class="btn-action btn-new-entry" onclick="openModal('New Entry')">Add Entry</button>
+            </div>
+            <div class="list-container">
+                <h4 style="margin-bottom: 10px; color: #636e72;">Transaction History</h4>
+                
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <div>
+                            <span class="name">Lent Money</span>
+                            <div class="transaction-sub">
+                                <span>10 Oct 2023</span>
+                                <span class="badge">GPay</span>
+                            </div>
+                        </div>
+                        <span class="amount lend">₹ 4,000</span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="icon-btn edit" onclick="openModal('Edit Entry')">✏️</button>
+                        <button class="icon-btn delete" onclick="confirmDelete('Entry: ₹4,000')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-details-borrow" class="page">
+            <div class="person-summary">
+                <h2 id="detail-name-borrow">Amit</h2>
+                <p>You Owe: <strong class="amount borrow">₹ 1,500</strong></p>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-action btn-return" onclick="openModal('Return Money')">Log Repayment</button>
+                <button class="btn-action btn-new-entry" onclick="openModal('New Entry')">Add Entry</button>
+            </div>
+            <div class="list-container">
+                <h4 style="margin-bottom: 10px; color: #636e72;">Transaction History</h4>
+                
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <div>
+                            <span class="name">Borrowed Money</span>
+                            <div class="transaction-sub">
+                                <span>01 Nov 2023</span>
+                                <span class="badge">UPI</span>
+                            </div>
+                        </div>
+                        <span class="amount borrow">₹ 1,500</span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="icon-btn edit" onclick="openModal('Edit Entry')">✏️</button>
+                        <button class="icon-btn delete" onclick="confirmDelete('Entry: ₹1,500')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="action-modal" class="modal-overlay" onclick="closeModal(event, 'action-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 id="modal-title" style="margin-bottom: 25px; font-size: 1.4rem;">Add New</h3>
+            
+            <div class="form-group" id="name-group">
+                <label>Person's Name</label>
+                <input type="text" placeholder="e.g. Rohan">
+            </div>
+            
+            <div class="form-group">
+                <label>Amount (₹)</label>
+                <input type="number" placeholder="0.00">
+            </div>
+
+            <div class="form-group" id="method-group">
+                <label>Payment Method</label>
+                <select id="payment-method">
+                    <option>Cash</option>
+                    <option>GPay</option>
+                    <option>Paytm</option>
+                    <option>PhonePe</option>
+                    <option>UPI</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="date-group">
+                <label>Date</label>
+                <input type="date" id="date-picker">
+            </div>
+
+            <button class="btn-submit" id="submit-btn" onclick="closeModalDirect('action-modal')">Save Details</button>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="modal-overlay" onclick="closeModal(event, 'delete-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="text-align: center;">
+            <h3 style="margin-bottom: 15px; color: var(--danger);">Confirm Delete</h3>
+            <p id="delete-text" style="margin-bottom: 25px; color: var(--text-muted);">Are you sure you want to delete this?</p>
+            <button class="btn-submit delete" onclick="closeModalDirect('delete-modal')">Yes, Delete</button>
+            <button class="btn-submit" style="background: #dfe6e9; color: var(--text-main);" onclick="closeModalDirect('delete-modal')">Cancel</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.getElementById('date-picker').valueAsDate = new Date();
+    let historyStack = ['page-home'];
+
+    function navigate(targetId, title) {
+        const currentId = historyStack[historyStack.length - 1];
+        if(currentId === targetId) return;
+
+        document.getElementById(currentId).classList.remove('active');
+        document.getElementById(currentId).classList.add('prev');
+        
+        if(targetId === 'page-details-lend') {
+            document.getElementById('detail-name-lend').innerText = title;
+            title = "Details"; 
+        } else if (targetId === 'page-details-borrow') {
+            document.getElementById('detail-name-borrow').innerText = title;
+            title = "Details";
+        }
+
+        const targetPage = document.getElementById(targetId);
+        targetPage.classList.remove('prev');
+        targetPage.classList.add('active');
+
+        document.getElementById('header-title').innerText = title;
+        document.getElementById('backBtn').style.display = 'block';
+
+        historyStack.push(targetId);
+    }
+
+    function goBack() {
+        if (historyStack.length <= 1) return;
+
+        const currentId = historyStack.pop();
+        const prevId = historyStack[historyStack.length - 1];
+
+        document.getElementById(currentId).classList.remove('active');
+        const prevPage = document.getElementById(prevId);
+        prevPage.classList.remove('prev');
+        prevPage.classList.add('active');
+
+        let title = 'Dashboard';
+        if (prevId === 'page-lend') title = 'Lent To';
+        if (prevId === 'page-borrow') title = 'Borrowed From';
+        
+        document.getElementById('header-title').innerText = title;
+        document.getElementById('backBtn').style.display = prevId === 'page-home' ? 'none' : 'block';
+    }
+
+    function openModal(actionType) {
+        const modal = document.getElementById('action-modal');
+        const titleEl = document.getElementById('modal-title');
+        const nameGroup = document.getElementById('name-group');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        titleEl.innerText = actionType;
+        submitBtn.className = 'btn-submit';
+        submitBtn.innerText = 'Save Details';
+
+        if(actionType === 'New Person') {
+            nameGroup.style.display = 'block';
+        } else if (actionType === 'New Entry' || actionType === 'Edit Entry') {
+            nameGroup.style.display = 'none';
+            if(actionType === 'Edit Entry') submitBtn.innerText = 'Update Entry';
+        } else if (actionType === 'Return Money') {
+            nameGroup.style.display = 'none';
+            submitBtn.className = 'btn-submit return';
+            submitBtn.innerText = 'Confirm Return';
+        }
+        
+        modal.classList.add('active');
+    }
+
+    function confirmDelete(itemName) {
+        document.getElementById('delete-text').innerText = `Are you sure you want to delete ${itemName}? This cannot be undone.`;
+        document.getElementById('delete-modal').classList.add('active');
+    }
+
+    function closeModal(event, modalId) {
+        if (event.target === document.getElementById(modalId)) {
+            closeModalDirect(modalId);
+        }
+    }
+
+    function closeModalDirect(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+</script>
+
+</body>
+</html>
+
